@@ -137,6 +137,8 @@ public class GameManager : MonoBehaviour
     {
         if (gameOverText != null)
         {
+            bestScoreText.gameObject.SetActive(false);
+            errorsText.gameObject.SetActive(false);
             gameOverText.gameObject.SetActive(true);
             gameOverText.text = "¡Ganaste!";
         }
@@ -155,6 +157,8 @@ public class GameManager : MonoBehaviour
     {
         if (gameOverText != null)
         {
+            bestScoreText.gameObject.SetActive(false);
+            errorsText.gameObject.SetActive(false);
             gameOverText.gameObject.SetActive(true);
             gameOverText.text = "Perdiste";
         }
@@ -187,7 +191,7 @@ public class GameManager : MonoBehaviour
     void UpdateScoreText()
     {
         if (scoreText != null)
-            scoreText.text = "Score: " + score;
+            scoreText.text = "Puntaje: " + score;
     }
 
     void UpdateErrorsText()
@@ -199,6 +203,6 @@ public class GameManager : MonoBehaviour
     void UpdateBestScoreText()
     {
         if (bestScoreText != null)
-            bestScoreText.text = "Mejor: " + bestScore;
+            bestScoreText.text = "Mejor Puntaje: " + bestScore;
     }
 }
