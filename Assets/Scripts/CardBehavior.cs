@@ -66,4 +66,16 @@ public class CardBehavior : MonoBehaviour
         if (cardRenderer != null)
             cardRenderer.material = isFlipped ? frontMaterial : backMaterial;
     }
+
+    public void SetFrontMaterial(Material material)
+    {
+        frontMaterial = material;
+        if (isFlipped) SetMaterial();
+    }
+
+    public void SetBackMaterial(Material material)
+    {
+        backMaterial = material;
+        if (!isFlipped) SetMaterial();
+    }
 }

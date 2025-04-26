@@ -1,26 +1,30 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    public GameObject cardPrefab;
     public ARRaycastManager raycastManager;
-    public int gridRows = 4;
-    public int gridCols = 4;
-    public float spacing = 1.2f;
+    public TextMeshProUGUI scoreText;
+    public TextMeshProUGUI gameOverText;
+    public TextMeshProUGUI errorsText; // 👈 nuevo campo para mostrar errores
+    public TextMeshProUGUI bestScoreText; // 👈 para mostrar mejor score guardado
+
+    private int score = 0;
+    private int errors = 0;
+    private int bestScore = 0;
+    public int maxErrors = 5;
 
     private List<ARRaycastHit> hits = new List<ARRaycastHit>();
     private bool cardsPlaced = false;
 
     private CardBehavior firstCard;
     private CardBehavior secondCard;
-
-    private List<int> cardIds = new List<int>();
     private List<CardBehavior> spawnedCards = new List<CardBehavior>();
     private int matchCount = 0;
 
@@ -28,61 +32,56 @@ public class GameManager : MonoBehaviour
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+
+        bestScore = PlayerPrefs.GetInt("BestScore", 0); // 👈 Cargar mejor score
     }
 
     void Start()
     {
-        GenerateCardIds();
+        UpdateScoreText();
+        UpdateErrorsText();
+        UpdateBestScoreText();
     }
 
     void Update()
     {
+#if UNITY_EDITOR
+        if (Input.GetMouseButtonDown(0) && !cardsPlaced)
+        {
+            Vector3 forward = Camera.main.transform.forward;
+            Vector3 spawnCenter = Camera.main.transform.position + forward * 1.2f;
+            PlaceCards(spawnCenter);
+            cardsPlaced = true;
+        }
+#else
         if (Input.touchCount > 0 && !cardsPlaced)
         {
             Touch touch = Input.GetTouch(0);
-            if (raycastManager.Raycast(touch.position, hits, TrackableType.PlaneWithinPolygon))
+            if (touch.phase == TouchPhase.Began)
             {
-                Pose hitPose = hits[0].pose;
-                PlaceCards(hitPose.position);
-                cardsPlaced = true;
+                if (raycastManager.Raycast(touch.position, hits, TrackableType.PlaneWithinPolygon))
+                {
+                    Pose hitPose = hits[0].pose;
+                    Vector3 spawnCenter = hitPose.position + Vector3.forward * 0.5f;
+                    PlaceCards(spawnCenter);
+                    cardsPlaced = true;
+                }
             }
         }
-    }
-
-    void GenerateCardIds()
-    {
-        cardIds.Clear();
-        for (int i = 0; i < (gridRows * gridCols) / 2; i++)
-        {
-            cardIds.Add(i);
-            cardIds.Add(i);
-        }
-        Shuffle(cardIds);
+#endif
     }
 
     void PlaceCards(Vector3 center)
     {
-        float startX = center.x - (gridCols / 2f) * spacing;
-        float startY = center.y + 0.2f; // Altura fija (puedes ajustar)
-        float startZ = center.z + 0.5f; // Un poco delante del plano detectado
-
-        int index = 0;
-
-        for (int i = 0; i < gridRows; i++)
-        {
-            for (int j = 0; j < gridCols; j++)
-            {
-                Vector3 pos = new Vector3(startX + j * spacing, startY - i * spacing, startZ);
-                Quaternion rotation = Quaternion.LookRotation(Camera.main.transform.forward); // Mira hacia la c�mara
-
-                GameObject cardObj = Instantiate(cardPrefab, pos, rotation);
-                CardBehavior card = cardObj.GetComponent<CardBehavior>();
-                card.cardId = cardIds[index++];
-                spawnedCards.Add(card);
-            }
-        }
+        CardSpawner.Instance.GenerateCardIds();
+        CardSpawner.Instance.SpawnCards(center);
+        cardsPlaced = true;
     }
 
+    public void RegisterCard(CardBehavior card)
+    {
+        spawnedCards.Add(card);
+    }
 
     public bool CanFlip()
     {
@@ -109,17 +108,57 @@ public class GameManager : MonoBehaviour
         if (firstCard.cardId == secondCard.cardId)
         {
             matchCount++;
-            if (matchCount == (gridRows * gridCols) / 2)
-                Invoke("ResetGame", 2f); // Reiniciar tras peque�o delay
+            score += 10;
+            UpdateScoreText();
+
+            if (matchCount == (CardSpawner.Instance.gridRows * CardSpawner.Instance.gridCols) / 2)
+            {
+                Invoke("WinGame", 1f);
+            }
         }
         else
         {
+            errors++;
+            UpdateErrorsText();
             firstCard.FlipBack();
             secondCard.FlipBack();
+
+            if (errors >= maxErrors)
+            {
+                Invoke("LoseGame", 1f);
+            }
         }
 
         firstCard = null;
         secondCard = null;
+    }
+
+    void WinGame()
+    {
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(true);
+            gameOverText.text = "¡Ganaste!";
+        }
+
+        if (score > bestScore)
+        {
+            bestScore = score;
+            PlayerPrefs.SetInt("BestScore", bestScore);
+            UpdateBestScoreText();
+        }
+
+        Invoke("ResetGame", 3f);
+    }
+
+    void LoseGame()
+    {
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(true);
+            gameOverText.text = "Perdiste";
+        }
+        Invoke("ResetGame", 3f);
     }
 
     void ResetGame()
@@ -133,20 +172,33 @@ public class GameManager : MonoBehaviour
         secondCard = null;
         matchCount = 0;
         cardsPlaced = false;
-        GenerateCardIds();
+        score = 0;
+        errors = 0;
+
+        UpdateScoreText();
+        UpdateErrorsText();
+
+        if (gameOverText != null)
+            gameOverText.gameObject.SetActive(false);
+
+        CardSpawner.Instance.GenerateCardIds();
     }
 
-    void Shuffle(List<int> list)
+    void UpdateScoreText()
     {
-        for (int i = 0; i < list.Count; i++)
-        {
-            int temp = list[i];
-            int randomIndex = Random.Range(i, list.Count);
-            list[i] = list[randomIndex];
-            list[randomIndex] = temp;
-        }
+        if (scoreText != null)
+            scoreText.text = "Score: " + score;
+    }
+
+    void UpdateErrorsText()
+    {
+        if (errorsText != null)
+            errorsText.text = "Errores: " + errors + "/" + maxErrors;
+    }
+
+    void UpdateBestScoreText()
+    {
+        if (bestScoreText != null)
+            bestScoreText.text = "Mejor: " + bestScore;
     }
 }
-
-
-

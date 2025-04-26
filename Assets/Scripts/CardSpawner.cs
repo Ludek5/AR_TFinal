@@ -1,80 +1,77 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.XR.ARFoundation;
-using UnityEngine.XR.ARSubsystems;
 
 public class CardSpawner : MonoBehaviour
 {
+    public static CardSpawner Instance { get; private set; }
+
     public GameObject cardPrefab;
-    public ARRaycastManager raycastManager;
 
     public int gridRows = 4;
     public int gridCols = 4;
-    public float spacing = 0.45f;
+    public float spacingX = 0.22f;
+    public float spacingY = 0.3f;
+    public float cardScale = 0.2f;
 
-    private bool cardsPlaced = false;
-    private List<ARRaycastHit> hits = new List<ARRaycastHit>();
+    public List<Material> cardFrontMaterials; // Materiales de frente
+    public Material cardBackMaterial; // Material trasero
 
-    void Update()
+    private List<int> cardIds = new List<int>();
+
+    private void Awake()
     {
-#if UNITY_EDITOR
-        if (Input.GetMouseButtonDown(0) && !cardsPlaced)
-        {
-            Vector3 forward = Camera.main.transform.forward;
-            Vector3 spawnCenter = Camera.main.transform.position + forward * 1.2f;
-            PlaceCards(spawnCenter);
-            cardsPlaced = true;
-        }
-#else
-        if (Input.touchCount > 0 && !cardsPlaced)
-        {
-            Touch touch = Input.GetTouch(0);
-            if (touch.phase == TouchPhase.Began)
-            {
-                if (raycastManager.Raycast(touch.position, hits, TrackableType.PlaneWithinPolygon))
-                {
-                    Pose hitPose = hits[0].pose;
-                    Vector3 spawnCenter = hitPose.position + Vector3.forward * 0.5f;
-                    PlaceCards(spawnCenter);
-                    cardsPlaced = true;
-                }
-            }
-        }
-#endif
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
     }
 
-    void PlaceCards(Vector3 center)
+    public void GenerateCardIds()
     {
-        float startX = center.x - (gridCols / 2f) * spacing;
+        cardIds.Clear();
+        for (int i = 0; i < (gridRows * gridCols) / 2; i++)
+        {
+            cardIds.Add(i);
+            cardIds.Add(i);
+        }
+        Shuffle(cardIds);
+    }
+
+    public void SpawnCards(Vector3 center)
+    {
+        float startX = center.x - (gridCols / 2f) * spacingX;
         float startY = center.y;
         float startZ = center.z;
 
-        int totalCards = gridRows * gridCols;
-        List<int> cardIds = new List<int>();
-
-        for (int i = 0; i < totalCards / 2; i++)
-        {
-            cardIds.Add(i);
-            cardIds.Add(i);
-        }
-
-        Shuffle(cardIds);
-
         int index = 0;
+
         for (int i = 0; i < gridRows; i++)
         {
             for (int j = 0; j < gridCols; j++)
             {
-                Vector3 pos = new Vector3(startX + j * spacing, startY - i * spacing, startZ);
+                Vector3 pos = new Vector3(startX + j * spacingX, startY - i * spacingY, startZ);
                 Quaternion rot = Quaternion.LookRotation(Camera.main.transform.forward);
+
                 GameObject card = Instantiate(cardPrefab, pos, rot);
-                card.transform.localScale = Vector3.one * 0.2f;
-                card.GetComponent<CardBehavior>().cardId = cardIds[index++];
+                card.transform.localScale = Vector3.one * cardScale;
+
+                // Asignar ID
+                CardBehavior cardBehavior = card.GetComponent<CardBehavior>();
+                cardBehavior.cardId = cardIds[index];
+
+                // Asignar materiales
+                if (cardIds[index] >= 0 && cardIds[index] < cardFrontMaterials.Count)
+                {
+                    cardBehavior.SetFrontMaterial(cardFrontMaterials[cardIds[index]]);
+                }
+                cardBehavior.SetBackMaterial(cardBackMaterial);
+
+                GameManager.Instance.RegisterCard(cardBehavior);
+
+                index++;
             }
         }
     }
 
-    void Shuffle(List<int> list)
+    private void Shuffle(List<int> list)
     {
         for (int i = 0; i < list.Count; i++)
         {
@@ -85,6 +82,3 @@ public class CardSpawner : MonoBehaviour
         }
     }
 }
-
-
-
