@@ -12,8 +12,8 @@ public class GameManager : MonoBehaviour
     public ARRaycastManager raycastManager;
     public TextMeshProUGUI scoreText;
     public TextMeshProUGUI gameOverText;
-    public TextMeshProUGUI errorsText; // 👈 nuevo campo para mostrar errores
-    public TextMeshProUGUI bestScoreText; // 👈 para mostrar mejor score guardado
+    public TextMeshProUGUI errorsText; 
+    public TextMeshProUGUI bestScoreText; 
 
     private int score = 0;
     private int errors = 0;
@@ -33,7 +33,7 @@ public class GameManager : MonoBehaviour
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
-        bestScore = PlayerPrefs.GetInt("BestScore", 0); // 👈 Cargar mejor score
+        bestScore = PlayerPrefs.GetInt("BestScore", 0); 
     }
 
     void Start()
@@ -137,8 +137,6 @@ public class GameManager : MonoBehaviour
     {
         if (gameOverText != null)
         {
-            bestScoreText.gameObject.SetActive(false);
-            errorsText.gameObject.SetActive(false);
             gameOverText.gameObject.SetActive(true);
             gameOverText.text = "¡Ganaste!";
         }
@@ -157,8 +155,6 @@ public class GameManager : MonoBehaviour
     {
         if (gameOverText != null)
         {
-            bestScoreText.gameObject.SetActive(false);
-            errorsText.gameObject.SetActive(false);
             gameOverText.gameObject.SetActive(true);
             gameOverText.text = "Perdiste";
         }
